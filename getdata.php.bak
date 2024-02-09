@@ -1,0 +1,79 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+session_start();
+
+//Disable Including the File
+
+if (get_included_files()[0] != __FILE__) {return;}
+
+
+
+include_once "main.php";
+
+include_once "database.php";
+
+include_once "roblox_handler.php";
+
+
+
+$SecretKey = "S0meS3cretK3y";
+
+
+
+if (!isset($_POST["SecretKey"]) or !isset($_POST["UserKey"])) {
+
+    http_response_code(400);
+
+    exit("400 Bad Request - auth invalid: ". json_encode($_POST));
+
+}
+
+if ($_POST['SecretKey'] != $SecretKey) {
+
+    http_response_code(401);
+
+    exit("401 Unauthorized");
+
+}
+
+$userKey = $_POST["UserKey"];
+
+global $conn;
+
+//Get User Info From Session Id
+
+$result = $conn->queryPrepared("SELECT * FROM `session`,`user` WHERE `session_id` = ? AND session.user_id = user.user_id", [$userKey]);
+
+if ($result->num_rows == 0) {
+    http_response_code(401);
+
+    exit("400 Bad Request - user sesdion not found");
+
+}
+
+$row = $result->fetch_assoc();
+
+$data = [
+
+    "userid" => $row["user_id"],
+
+    "displayname" => $row["display_name"] ? $row["display_name"] : $row["username"],
+
+    "rank" => $row["rank"],
+
+    "thumbnail" => $row["thumbnail"]
+
+];
+
+$result = $conn->query('SELECT COUNT(*) FROM games WHERE starter_id = "'.$row['user_id'].'" OR player_id = "'.$row['user_id'].'"');
+$row = $result->fetch_row(); $games_played = intval($row[0]);
+
+$data['games'] = $games_played;
+
+http_response_code(200);
+
+echo json_encode($data);
+
+?>
